@@ -1,0 +1,57 @@
+name: Scope Moniter
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  push:
+    branches:
+      - main
+
+# Actions project permission
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23.3'  # Specify the version of Go you want to use
+
+    - name: Removing old plugins.json
+      run: |
+        rm -rf plugins.json
+
+    - name: Installing tar and wppdm via binary
+      run: |
+        sudo apt install tar
+
+        wget https://github.com/rix4uni/wppdm/releases/download/v0.0.1/wppdm-linux-amd64-0.0.1.tgz
+        tar -xvzf wppdm-linux-amd64-0.0.1.tgz
+        rm -rf wppdm-linux-amd64-0.0.1.tgz
+        mv wppdm ~/go/bin/wppdm
+
+    - name: Running wppdm scrape
+      run: |
+        wppdm scrape | tee -a plugins.json
+
+    - name: Commit and push changes if there are any
+      run: |
+        git config --global user.name 'GitHub Actions'
+        git config --global user.email 'actions@users.noreply.github.com'
+        git add .
+
+        # Check if there are changes before committing
+        if ! git diff --cached --exit-code; then
+          IST_DATE=$(TZ='Asia/Kolkata' date +'%a %b %d %H:%M:%S IST %Y')
+          git commit -m "Updated List: $IST_DATE"
+          git push
+        else
+          echo "No changes to commit"
+        fi
